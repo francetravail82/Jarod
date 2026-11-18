@@ -680,9 +680,9 @@ function openCinema(o) {
       const inn = $('.fv-in', fvPanel); inn.innerHTML = ''; o.build(inn, finish); fvPanel.scrollTop = 0;
       const b = $('button, input', inn); if (b) b.focus({ preventScroll: true });
     };
-    const play = () => { const r = fvV.play(); if (r && r.catch) r.catch(() => { if (!shown && !done) fvPlay.hidden = false; }); };
+    const play = () => { const r = fvV.play(); if (r && r.catch) r.catch(() => { if (!shown && !done && fvPh.hidden) fvPlay.hidden = false; }); };
     const placeholder = missing => {
-      fvV.hidden = fvSkip.hidden = true; fvPh.hidden = false;
+      fvV.hidden = fvSkip.hidden = fvPlay.hidden = true; fvPh.hidden = false;
       fvPh.innerHTML = `<img src="${o.img}" alt=""><p><b>Ici : la vidéo de ${o.who}</b></p><p class="m-note">${missing ? 'Vidéo introuvable ou illisible (utilise un MP4 en H.264)' : 'Fichier attendu'} : <code>${o.src}</code></p><div class="row"><button type="button" class="mini" id="ph-pick">Choisir une vidéo (test)</button><button type="button" class="btn btn-sun" id="ph-go">Continuer sans vidéo</button></div>`;
       $('#ph-pick').onclick = () => $('#file-fv').click(); $('#ph-go').onclick = () => showPanel(true);
     };
@@ -690,7 +690,7 @@ function openCinema(o) {
       if (!src) return placeholder(false);
       fvPh.hidden = true; fvV.hidden = false; fvSkip.hidden = false;
       fvV.onloadedmetadata = () => { const vr = fvV.videoWidth / (fvV.videoHeight || 1), sr = innerWidth / (innerHeight || 1); fvV.style.objectFit = Math.abs(Math.log(vr / sr)) < .3 ? 'cover' : 'contain'; };
-      fvV.ontimeupdate = () => { const at = o.at === undefined ? 5 : o.at; if (!shown && at !== null && fvV.currentTime >= at) showPanel(false); if (fvV.duration) fvBar.style.width = (100 * fvV.currentTime / fvV.duration) + '%'; };
+      fvV.ontimeupdate = () => { const at = o.at === undefined ? 2 : o.at; if (!shown && at !== null && fvV.currentTime >= at) showPanel(false); if (fvV.duration) fvBar.style.width = (100 * fvV.currentTime / fvV.duration) + '%'; };
       fvV.onended = () => showPanel(false); fvV.onerror = () => { if (done || shown) return;
         if (pickedFile && !fb && pickedFile.size < 40e6) { const fr = new FileReader(); fr.onload = () => { localVids[o.key] = fr.result; load(fr.result, true); }; fr.onerror = () => placeholder(true); fr.readAsDataURL(pickedFile); return; }
         placeholder(true); };
