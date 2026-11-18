@@ -670,7 +670,7 @@ function cinema(o) { const p = fvChain.then(() => openCinema(o)); fvChain = p.ca
 function openCinema(o) {
   return new Promise(resolve => {
     state.paused = true; state.modalOpen = true; keys.clear(); touch.left = touch.right = touch.jump = false;
-    let done = false, shown = false;
+    let done = false, shown = false, pickedFile = null;
     $('#fv-who').textContent = o.who; $('#fv-who').className = 'fv-who ' + (o.cls || '');
     fvPanel.hidden = fvPh.hidden = fvPlay.hidden = fvV.hidden = true; fvSkip.hidden = false; fvBar.style.width = '0'; fv.hidden = false;
     const finish = v => { if (done) return; done = true; fvV.onended = fvV.onerror = fvV.ontimeupdate = fvV.onloadedmetadata = null; fvV.pause(); fvV.removeAttribute('src'); fv.hidden = true; state.paused = false; state.modalOpen = false; resolve(v); };
@@ -683,20 +683,22 @@ function openCinema(o) {
     const play = () => { const r = fvV.play(); if (r && r.catch) r.catch(() => { if (!shown && !done) fvPlay.hidden = false; }); };
     const placeholder = missing => {
       fvV.hidden = fvSkip.hidden = true; fvPh.hidden = false;
-      fvPh.innerHTML = `<img src="${o.img}" alt=""><p><b>Ici : la vidéo de ${o.who}</b></p><p class="m-note">${missing ? 'Fichier introuvable' : 'Fichier attendu'} : <code>${o.src}</code></p><div class="row"><button type="button" class="mini" id="ph-pick">Choisir une vidéo (test)</button><button type="button" class="btn btn-sun" id="ph-go">Continuer sans vidéo</button></div>`;
+      fvPh.innerHTML = `<img src="${o.img}" alt=""><p><b>Ici : la vidéo de ${o.who}</b></p><p class="m-note">${missing ? 'Vidéo introuvable ou illisible (utilise un MP4 en H.264)' : 'Fichier attendu'} : <code>${o.src}</code></p><div class="row"><button type="button" class="mini" id="ph-pick">Choisir une vidéo (test)</button><button type="button" class="btn btn-sun" id="ph-go">Continuer sans vidéo</button></div>`;
       $('#ph-pick').onclick = () => $('#file-fv').click(); $('#ph-go').onclick = () => showPanel(true);
     };
-    const load = src => {
+    const load = (src, fb) => {
       if (!src) return placeholder(false);
       fvPh.hidden = true; fvV.hidden = false; fvSkip.hidden = false;
       fvV.onloadedmetadata = () => { const vr = fvV.videoWidth / (fvV.videoHeight || 1), sr = innerWidth / (innerHeight || 1); fvV.style.objectFit = Math.abs(Math.log(vr / sr)) < .3 ? 'cover' : 'contain'; };
       fvV.ontimeupdate = () => { const at = o.at === undefined ? 5 : o.at; if (!shown && at !== null && fvV.currentTime >= at) showPanel(false); if (fvV.duration) fvBar.style.width = (100 * fvV.currentTime / fvV.duration) + '%'; };
-      fvV.onended = () => showPanel(false); fvV.onerror = () => { if (!done && !shown) placeholder(true); };
+      fvV.onended = () => showPanel(false); fvV.onerror = () => { if (done || shown) return;
+        if (pickedFile && !fb && pickedFile.size < 40e6) { const fr = new FileReader(); fr.onload = () => { localVids[o.key] = fr.result; load(fr.result, true); }; fr.onerror = () => placeholder(true); fr.readAsDataURL(pickedFile); return; }
+        placeholder(true); };
       fvV.src = src; play();
     };
     fvSkip.onclick = () => showPanel(true); fvPlay.onclick = () => { fvPlay.hidden = true; play(); };
     fvV.onclick = () => { if (!shown) fvV.paused ? play() : fvV.pause(); };
-    $('#file-fv').onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return; localVids[o.key] = URL.createObjectURL(f); e.target.value = ''; load(localVids[o.key]); };
+    $('#file-fv').onchange = e => { const f = e.target.files && e.target.files[0]; if (!f) return; pickedFile = f; localVids[o.key] = URL.createObjectURL(f); e.target.value = ''; load(localVids[o.key]); };
     load(localVids[o.key] || o.src);
   });
 }
@@ -930,7 +932,7 @@ function notice(e, how, out) {
 }
 
 async function runStation(st) {
-  const si = STATIONS.indexOf(st);
+  const si = STATIONS.findIndex(x => x.id === st.id);
   for (const p of players) {
     const who = players.length > 1 ? `Joueur ${p.i + 1} · ` : '';
     const opts = st.options(p);
